@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "AI_Agent"
 version = "0.2.0"
-description = "A production-grade, modular, tool-enabled autonomous AI Agent system."
+description = "A production-grade, modular, tool-enabled autonomous AI Agent system with CLI & Web UI."
 readme = "README.md"
 authors = [
     { name = "CodeWithIdris", email = "codewithidris@github.com" }
@@ -16,6 +16,7 @@ dependencies = [
     "huggingface-hub>=1.11.0",
     "openai>=2.32.0",
     "python-dotenv>=1.2.2",
+    "streamlit>=1.35.0",
 ]
 
 [project.urls]
