@@ -145,16 +145,16 @@ st.markdown("**Quick Actions:**")
 q1, q2, q3, q4 = st.columns(4)
 
 with q1:
-    if st.button("📁 List Workspace Files", use_container_width=True):
+    if st.button("List Workspace Files", use_container_width=True):
         st.session_state.pending_prompt = "List all files in the current workspace directory using list_files('.')"
 with q2:
-    if st.button("💻 Run Git Status", use_container_width=True):
+    if st.button(" Run Git Status", use_container_width=True):
         st.session_state.pending_prompt = "Run the terminal command 'git status' using run_terminal_command('git status')"
 with q3:
-    if st.button("🔍 Search for AIAgent", use_container_width=True):
+    if st.button(" Search for AIAgent", use_container_width=True):
         st.session_state.pending_prompt = "Search the codebase for 'AIAgent' using search_files('AIAgent')"
 with q4:
-    if st.button("🧠 Recall Memories", use_container_width=True):
+    if st.button(" Recall Memories", use_container_width=True):
         st.session_state.pending_prompt = "Recall all stored memories using recall('')"
 
 st.markdown("")
@@ -165,7 +165,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if "tool_calls" in msg:
             for tc in msg["tool_calls"]:
-                with st.expander(f"🛠️ Tool Call: `{tc['name']}`"):
+                with st.expander(f" Tool Call: `{tc['name']}`"):
                     st.write(f"**Arguments**: `{tc['args']}`")
                     st.code(tc["result"], language="text")
 

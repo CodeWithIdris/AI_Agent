@@ -17,7 +17,7 @@ class ToolRegistry:
         self.register("create_file", create_file)
         self.register("search_files", search_files)
         self.register("run_terminal_command", run_terminal_command)
-
+        
     def register(self, name: str, func: Callable) -> None:
         """Register a Python callable as a named tool."""
         self._tools[name] = func
