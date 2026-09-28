@@ -83,7 +83,9 @@ with st.sidebar:
 
 
     # Navigation Tabs
-    tab_memory, tab_search, tab_files, tab_git, tab_tools = st.tabs(["🧠 Memory", "🔍 Search", "📁 Files", "🌿 Git & Diffs", "🛠️ Tools"])
+    tab_memory, tab_search, tab_symbols, tab_files, tab_git, tab_tools = st.tabs(
+        ["🧠 Memory", "🔍 Search", "🧩 Symbols", "📁 Files", "🌿 Git & Diffs", "🛠️ Tools"]
+    )
 
     # Tab 1: Memory Manager
     with tab_memory:
@@ -145,7 +147,38 @@ with st.sidebar:
             else:
                 st.warning("Please enter a keyword.")
 
-    # Tab 3: File Explorer
+    # Tab 3: AST Symbols & Outline
+    with tab_symbols:
+        st.caption("AST Code Outline & Symbol Indexer")
+        st.markdown("**File Structure Outline**")
+        outline_file = st.text_input("Target Python/Doc File", placeholder="e.g. ai_agent/agent.py")
+        if st.button("Generate Outline"):
+            if outline_file:
+                outline_res = agent.tools.execute("get_code_outline", outline_file)
+                st.text_area("AST Outline", value=outline_res, height=220)
+            else:
+                st.warning("Please specify a file path.")
+
+        st.divider()
+        st.markdown("**Symbol Search & References**")
+        sym_input = st.text_input("Symbol Name", placeholder="e.g. ToolRegistry or auto_debug")
+        c_sym1, c_sym2 = st.columns(2)
+        with c_sym1:
+            if st.button("Find Definitions"):
+                if sym_input:
+                    sym_res = agent.tools.execute("find_symbol", sym_input)
+                    st.text_area("Definitions", value=sym_res, height=200)
+                else:
+                    st.warning("Enter a symbol name.")
+        with c_sym2:
+            if st.button("Find References"):
+                if sym_input:
+                    refs_res = agent.tools.execute("find_references", sym_input)
+                    st.text_area("References", value=refs_res, height=200)
+                else:
+                    st.warning("Enter a symbol name.")
+
+    # Tab 4: File Explorer
     with tab_files:
         st.caption("Workspace File Viewer")
         tree = list_files(".")
@@ -219,25 +252,28 @@ st.divider()
 
 # Quick Prompt Action Chips
 st.markdown("**Quick Actions:**")
-q1, q2, q3, q4, q5, q6 = st.columns(6)
+q1, q2, q3, q4, q5, q6, q7 = st.columns(7)
 
 with q1:
-    if st.button("📁 List Files"):
+    if st.button("📁 Files"):
         st.session_state.pending_prompt = "List all files in the current workspace directory using list_files('.')"
 with q2:
-    if st.button("🌿 Git Diff"):
-        st.session_state.pending_prompt = "Inspect git changes using get_git_diff('.')"
+    if st.button("🧩 Outline"):
+        st.session_state.pending_prompt = "Generate the code outline for ai_agent/agent.py using get_code_outline('ai_agent/agent.py')"
 with q3:
-    if st.button("📋 Plan Task"):
-        st.session_state.pending_prompt = "Plan and break down adding an automated test into sequential steps."
+    if st.button("🌿 Diff"):
+        st.session_state.pending_prompt = "Inspect git changes using get_git_diff('.')"
 with q4:
-    if st.button("🌐 Web Docs"):
-        st.session_state.pending_prompt = "Search the web for 'Python 3.13 changelog features' using web_search('Python 3.13 changelog features')"
+    if st.button("📋 Plan"):
+        st.session_state.pending_prompt = "Plan and break down adding an automated test into sequential steps."
 with q5:
-    if st.button("🩺 Auto-Debug"):
-        st.session_state.pending_prompt = "Diagnose the workspace test suite using run_tests_with_diagnostics('pytest') and fix any failing tests."
+    if st.button("🌐 Docs"):
+        st.session_state.pending_prompt = "Search the web for 'Python 3.13 changelog features' using web_search('Python 3.13 changelog features')"
 with q6:
-    if st.button("🧠 Recall Memory"):
+    if st.button("🩺 Debug"):
+        st.session_state.pending_prompt = "Diagnose the workspace test suite using run_tests_with_diagnostics('pytest') and fix any failing tests."
+with q7:
+    if st.button("🧠 Memory"):
         st.session_state.pending_prompt = "Recall all stored memories using recall('')"
 
 

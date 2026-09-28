@@ -6,6 +6,7 @@ from .system_ops import run_terminal_command
 from .debug_ops import run_tests_with_diagnostics
 from .git_ops import get_git_diff, create_checkpoint, undo_last_change
 from .web_ops import web_search, fetch_webpage
+from .symbol_ops import get_code_outline, find_symbol, find_references
 from .parser import parse_tool_call
 
 
@@ -51,6 +52,9 @@ class ToolRegistry:
         self.register("undo_last_change", undo_last_change)
         self.register("web_search", web_search)
         self.register("fetch_webpage", fetch_webpage)
+        self.register("get_code_outline", get_code_outline)
+        self.register("find_symbol", find_symbol)
+        self.register("find_references", find_references)
 
 
 
@@ -186,6 +190,9 @@ __all__ = [
     "undo_last_change",
     "web_search",
     "fetch_webpage",
+    "get_code_outline",
+    "find_symbol",
+    "find_references",
 ]
 
 

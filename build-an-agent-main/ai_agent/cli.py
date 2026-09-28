@@ -73,6 +73,9 @@ def main():
                 print(f"{YELLOW}Available Commands:{RESET}")
                 print("  /help              - Display this help message")
                 print("  /plan [goal]       - Run two-phase plan-first autonomous task executor")
+                print("  /outline [file]    - View AST-based code outline of classes and functions")
+                print("  /symbol [name]     - Search codebase for symbol definitions (class, def, const)")
+                print("  /refs [name]       - Find references and calls to symbol across codebase")
                 print("  /undo              - One-click rollback of the agent's last file modification")
                 print("  /diff              - View live Git diff of workspace changes")
                 print("  /debug [command]   - Run autonomous self-healing debugger (e.g. /debug pytest)")
@@ -96,6 +99,36 @@ def main():
                 print(f"{CYAN}Fetching workspace Git diff...{RESET}")
                 diff_res = agent.diff()
                 print(f"{GREEN}{diff_res}{RESET}\n")
+                continue
+
+            if user_input.lower().startswith("/outline"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2 or not parts[1].strip():
+                    print(f"{YELLOW}Usage: /outline <path/to/file.py>{RESET}\n")
+                else:
+                    target_file = parts[1].strip()
+                    outline_res = agent.tools.execute("get_code_outline", target_file)
+                    print(f"{CYAN}{outline_res}{RESET}\n")
+                continue
+
+            if user_input.lower().startswith("/symbol"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2 or not parts[1].strip():
+                    print(f"{YELLOW}Usage: /symbol <symbol_name>{RESET}\n")
+                else:
+                    sym_name = parts[1].strip()
+                    sym_res = agent.tools.execute("find_symbol", sym_name)
+                    print(f"{CYAN}{sym_res}{RESET}\n")
+                continue
+
+            if user_input.lower().startswith("/refs"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2 or not parts[1].strip():
+                    print(f"{YELLOW}Usage: /refs <symbol_name>{RESET}\n")
+                else:
+                    ref_name = parts[1].strip()
+                    ref_res = agent.tools.execute("find_references", ref_name)
+                    print(f"{CYAN}{ref_res}{RESET}\n")
                 continue
 
             if user_input.lower().startswith("/plan"):
