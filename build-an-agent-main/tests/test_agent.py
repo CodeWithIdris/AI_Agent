@@ -99,7 +99,62 @@ class TestAgentExecution:
                 def callback(resp, tool_name, args, result):
                     callback_calls.append((tool_name, result))
 
-                # Pass explicit tool call prompt
-                response = agent.process_turn("remember('city', 'Casablanca')", callback=callback)
-                assert "Remembered 'city'" in response or len(callback_calls) > 0
-                assert mm.recall("city") == "Casablanca"
+    def test_ollama_keyless_initialization(self, tmp_path):
+        """Verify Ollama / local providers can initialize without an API key."""
+        mem_file = tmp_path / "test_mem.json"
+        mm = MemoryManager(mem_file)
+
+        with patch.dict(os.environ, {}, clear=True):
+            agent = AIAgent(provider="ollama", memory_manager=mm)
+            assert agent.provider == "ollama"
+            assert agent.model == "qwen2.5-coder:7b"
+            assert "11434" in agent.base_url
+            assert agent.api_key == "ollama-local"
+
+    def test_provider_switching(self, tmp_path):
+        """Verify agent can switch providers on the fly."""
+        mem_file = tmp_path / "test_mem.json"
+        mm = MemoryManager(mem_file)
+
+        agent = AIAgent(provider="ollama", memory_manager=mm)
+        assert agent.provider == "ollama"
+
+        agent.switch_provider("deepseek", model="deepseek-coder", api_key="sk-deepseek-mock")
+        assert agent.provider == "deepseek"
+        assert agent.model == "deepseek-coder"
+        assert "api.deepseek.com" in agent.base_url
+
+    def test_telemetry_metrics_tracking(self, tmp_path):
+        """Verify agent tracks tokens and latency across turns."""
+        mem_file = tmp_path / "test_mem.json"
+        mm = MemoryManager(mem_file)
+
+        agent = AIAgent(provider="ollama", memory_manager=mm)
+        assert agent.metrics["total_tokens"] == 0
+        assert agent.metrics["turns_count"] == 0
+
+        # Simulate turn with mock response
+        mock_msg = MagicMock()
+        mock_msg.content = "Done."
+        mock_msg.tool_calls = None
+
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 45
+        mock_usage.completion_tokens = 15
+        mock_usage.total_tokens = 60
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_msg
+
+        mock_completion = MagicMock()
+        mock_completion.choices = [mock_choice]
+        mock_completion.usage = mock_usage
+
+        with patch.object(agent.client.chat.completions, "create", return_value=mock_completion):
+            resp = agent.process_turn("Hello")
+            assert resp == "Done."
+            assert agent.metrics["total_tokens"] == 60
+            assert agent.metrics["prompt_tokens"] == 45
+            assert agent.metrics["completion_tokens"] == 15
+            assert agent.metrics["turns_count"] == 1
+

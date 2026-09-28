@@ -61,11 +61,51 @@ def main():
 
             if user_input.lower() == "/help":
                 print(f"{YELLOW}Available Commands:{RESET}")
-                print("  /help   - Display this help message")
-                print("  /memory - Display current durable memory state")
-                print("  /clear  - Clear current conversation history")
-                print("  /exit   - Exit the application\n")
+                print("  /help              - Display this help message")
+                print("  /provider [name]   - View active provider or switch (e.g. /provider ollama)")
+                print("  /model [name]      - View or switch active model")
+                print("  /tokens            - View session token telemetry and latency")
+                print("  /memory            - Display current durable memory state")
+                print("  /clear             - Clear current conversation history")
+                print("  /exit              - Exit the application\n")
                 continue
+
+            if user_input.lower().startswith("/provider"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) == 1:
+                    print(f"{CYAN}Active Provider:{RESET} {agent.provider} (Base URL: {agent.base_url})\n")
+                else:
+                    new_prov = parts[1].strip().lower()
+                    try:
+                        agent.switch_provider(new_prov)
+                        print(f"{GREEN}Switched provider to '{agent.provider}' (Model: {agent.model}){RESET}\n")
+                    except Exception as err:
+                        print(f"{RED}Provider switch error:{RESET} {err}\n")
+                continue
+
+            if user_input.lower().startswith("/model"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) == 1:
+                    print(f"{CYAN}Active Model:{RESET} {agent.model} (Provider: {agent.provider})\n")
+                else:
+                    new_model = parts[1].strip()
+                    try:
+                        agent.switch_provider(agent.provider, model=new_model)
+                        print(f"{GREEN}Switched model to '{agent.model}'{RESET}\n")
+                    except Exception as err:
+                        print(f"{RED}Model switch error:{RESET} {err}\n")
+                continue
+
+            if user_input.lower() == "/tokens":
+                m = agent.metrics
+                print(f"{MAGENTA}Session Telemetry:{RESET}")
+                print(f"  Turns Executed:     {m['turns_count']}")
+                print(f"  Prompt Tokens:      {m['prompt_tokens']}")
+                print(f"  Completion Tokens:  {m['completion_tokens']}")
+                print(f"  Total Tokens:       {m['total_tokens']}")
+                print(f"  Last Turn Latency:  {m['last_latency_seconds']}s\n")
+                continue
+
 
             # Process AI Agent Turn
             final_response = agent.process_turn(user_input, callback=tool_callback)

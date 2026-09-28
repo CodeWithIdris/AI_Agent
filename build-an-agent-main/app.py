@@ -35,10 +35,39 @@ memories_dict = agent.memory.load()
 
 # Sidebar Command Center
 with st.sidebar:
-    st.title("🤖 AI Agent")
-    st.markdown("Created by **[CodeWithIdris](https://github.com/CodeWithIdris)**")
-    st.caption(f"Model: `{agent.model}`")
+    st.title("🤖 AI Agent Cockpit")
+    st.markdown("Developed by **[CodeWithIdris](https://github.com/CodeWithIdris)**")
+
+    with st.expander("⚙️ Provider & Model Config", expanded=False):
+        prov_list = list(Config.PROVIDERS.keys())
+        current_idx = prov_list.index(agent.provider) if agent.provider in prov_list else 0
+        sel_prov = st.selectbox(
+            "LLM Provider",
+            options=prov_list,
+            index=current_idx,
+            format_func=lambda x: Config.PROVIDERS[x]["name"],
+        )
+        rec_models = Config.PROVIDERS[sel_prov]["recommended_models"]
+        model_idx = rec_models.index(agent.model) if agent.model in rec_models else 0
+        sel_model = st.selectbox("Model", options=rec_models, index=model_idx)
+
+        custom_key = st.text_input(
+            "API Key (Optional)",
+            value="",
+            type="password",
+            placeholder="Loaded from environment if empty",
+        )
+        if st.button("Apply Provider Settings"):
+            try:
+                agent.switch_provider(sel_prov, model=sel_model, api_key=custom_key if custom_key else None)
+                st.success(f"Switched to {Config.PROVIDERS[sel_prov]['name']}")
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
+
+    st.caption(f"Active: `{agent.provider}` ({agent.model})")
     st.divider()
+
 
     # Navigation Tabs
     tab_memory, tab_search, tab_files, tab_tools = st.tabs(["🧠 Memory", "🔍 Search", "📁 Files", "🛠️ Tools"])
@@ -135,16 +164,18 @@ with st.sidebar:
 
 
 # Main View Header
-st.title("🤖 AI Agent Assistant")
+st.title("🤖 AI Agent Cockpit")
 model_short_name = agent.model.split("/")[-1]
-st.caption(f"Autonomous Coding & Workspace Assistant powered by {model_short_name}")
+prov_name = Config.PROVIDERS.get(agent.provider, {}).get("name", agent.provider)
+st.caption(f"Autonomous Coding & Workspace Assistant powered by **{prov_name}** (`{model_short_name}`)")
 
 # Stat Metrics Row
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Active Model", model_short_name)
-m2.metric("Available Tools", f"{len(agent.tools.registered_tools)} Tools")
-m3.metric("Durable Memories", f"{len(memories_dict)} Items")
-m4.metric("Session Messages", f"{len(st.session_state.messages)}")
+m1.metric("Provider", prov_name)
+m2.metric("Active Model", model_short_name)
+m3.metric("Tokens Consumed", f"{agent.metrics['total_tokens']:,}")
+m4.metric("Durable Memories", f"{len(memories_dict)} Items")
+
 
 st.divider()
 
