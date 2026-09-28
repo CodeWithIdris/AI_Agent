@@ -90,8 +90,9 @@ python main.py
 | `search_files(keyword, path='.')` | Searches codebase files for matching text patterns (grep). |
 | `create_file(path, content)` | Creates a new file at specified path with given content. |
 | `list_files(path='.')` | Lists directory contents with `[DIR]` and `[FILE]` indicators. |
-| `read_file(path)` | Reads text content safely with UTF-8 encoding & binary protection. |
+| `read_file(path, start_line=1, end_line=None)` | Reads text content safely with line pagination & binary protection. |
 | `edit_file(path, old_str, new_str)` | Replaces text in a file or creates a new file if missing. |
+| `delete_file(path)` | Safely removes a file from the workspace. |
 | `remember(key, value)` | Stores a key-value pair in persistent memory. |
 | `recall(key='')` | Retrieves a specific memory or dumps all stored memories. |
 | `forget(key)` | Deletes a key-value pair from persistent memory. |

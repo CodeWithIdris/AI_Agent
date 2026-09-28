@@ -28,8 +28,21 @@ def search_files(keyword: str, path: str = ".") -> str:
     matches = []
     max_matches = 50  # Cap results to avoid overwhelming context window
 
-    # Directories to ignore
-    ignore_dirs = {".git", "__pycache__", ".venv", "node_modules", ".agent-memory.json"}
+    # Directories and files to ignore
+    ignore_dirs = {
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "env",
+        "node_modules",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".agent-memory.json",
+        ".ruff_cache",
+        "dist",
+        "build",
+    }
 
     try:
         for file_path in search_dir.rglob("*"):

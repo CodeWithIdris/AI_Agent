@@ -37,7 +37,7 @@ memories_dict = agent.memory.load()
 with st.sidebar:
     st.title("🤖 AI Agent")
     st.markdown("Created by **[CodeWithIdris](https://github.com/CodeWithIdris)**")
-    st.caption(f"Model: `{Config.DEFAULT_MODEL}`")
+    st.caption(f"Model: `{agent.model}`")
     st.divider()
 
     # Navigation Tabs
@@ -53,7 +53,6 @@ with st.sidebar:
                 data=json.dumps(memories_dict, indent=2),
                 file_name="agent-memory.json",
                 mime="application/json",
-                use_container_width=True,
             )
         else:
             st.info("No durable memories stored yet.")
@@ -63,7 +62,7 @@ with st.sidebar:
         with st.form("add_mem_form", clear_on_submit=True):
             k = st.text_input("Key", placeholder="e.g. user_preference")
             v = st.text_input("Value", placeholder="e.g. prefers Python")
-            if st.form_submit_button("Save Memory", use_container_width=True) and k and v:
+            if st.form_submit_button("Save Memory") and k and v:
                 agent.memory.remember(k, v)
                 st.success(f"Saved: {k}")
                 st.rerun()
@@ -71,16 +70,33 @@ with st.sidebar:
         if memories_dict:
             st.markdown("**Delete Memory**")
             del_k = st.selectbox("Select key to delete", options=list(memories_dict.keys()))
-            if st.button("Delete Key", use_container_width=True):
+            if st.button("Delete Key"):
                 agent.memory.forget(del_k)
                 st.warning(f"Deleted '{del_k}'")
                 st.rerun()
+
+        st.divider()
+        st.markdown("**Import Memories**")
+        uploaded_file = st.file_uploader("Upload memory JSON", type=["json"], label_visibility="collapsed")
+        if uploaded_file is not None:
+            try:
+                imported_data = json.load(uploaded_file)
+                if isinstance(imported_data, dict):
+                    curr = agent.memory.load()
+                    curr.update(imported_data)
+                    agent.memory.save(curr)
+                    st.success(f"Imported {len(imported_data)} memories!")
+                    st.rerun()
+                else:
+                    st.error("JSON must be a key-value object.")
+            except Exception as err:
+                st.error(f"Import error: {err}")
 
     # Tab 2: Code Search / Grep
     with tab_search:
         st.caption("Search across codebase files")
         query = st.text_input("Keyword", placeholder="e.g. AIAgent")
-        if st.button("Search Code", use_container_width=True):
+        if st.button("Search Code"):
             if query:
                 res = search_files(query, ".")
                 st.text_area("Results", value=res, height=300)
@@ -95,7 +111,7 @@ with st.sidebar:
 
         st.divider()
         inspect_file = st.text_input("File path", placeholder="e.g. main.py or README.md")
-        if st.button("View Source", use_container_width=True):
+        if st.button("View Source"):
             if inspect_file:
                 content = read_file(inspect_file)
                 ext = Path(inspect_file).suffix.lstrip(".") or "text"
@@ -105,23 +121,14 @@ with st.sidebar:
 
     # Tab 4: Available Tools
     with tab_tools:
-        st.caption("9 Registered System Tools")
-        signatures = [
-            "run_terminal_command(command)",
-            "search_files(keyword, path='.')",
-            "create_file(path, content)",
-            "read_file(path)",
-            "list_files(path='.')",
-            "edit_file(path, old_str, new_str)",
-            "remember(key, value)",
-            "recall(key='')",
-            "forget(key)",
-        ]
-        for sig in signatures:
+        tool_sigs = [s.strip() for s in agent.tools.get_prompt_signatures().split("), ")]
+        tool_sigs = [s if s.endswith(")") else f"{s})" for s in tool_sigs if s]
+        st.caption(f"{len(tool_sigs)} Registered System Tools")
+        for sig in tool_sigs:
             st.code(sig, language="python")
 
     st.divider()
-    if st.button("🧹 Clear Conversation", use_container_width=True):
+    if st.button("🧹 Clear Conversation"):
         st.session_state.messages = []
         agent.clear_history()
         st.rerun()
@@ -129,12 +136,13 @@ with st.sidebar:
 
 # Main View Header
 st.title("🤖 AI Agent Assistant")
-st.caption("Autonomous Coding & Workspace Assistant powered by Qwen-27B")
+model_short_name = agent.model.split("/")[-1]
+st.caption(f"Autonomous Coding & Workspace Assistant powered by {model_short_name}")
 
 # Stat Metrics Row
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Active Model", "Qwen-27B")
-m2.metric("Available Tools", "9 Tools")
+m1.metric("Active Model", model_short_name)
+m2.metric("Available Tools", f"{len(agent.tools.registered_tools)} Tools")
 m3.metric("Durable Memories", f"{len(memories_dict)} Items")
 m4.metric("Session Messages", f"{len(st.session_state.messages)}")
 
@@ -145,19 +153,20 @@ st.markdown("**Quick Actions:**")
 q1, q2, q3, q4 = st.columns(4)
 
 with q1:
-    if st.button("List Workspace Files", use_container_width=True):
+    if st.button("📁 List Workspace Files"):
         st.session_state.pending_prompt = "List all files in the current workspace directory using list_files('.')"
 with q2:
-    if st.button(" Run Git Status", use_container_width=True):
+    if st.button("🌿 Run Git Status"):
         st.session_state.pending_prompt = "Run the terminal command 'git status' using run_terminal_command('git status')"
 with q3:
-    if st.button(" Search for AIAgent", use_container_width=True):
+    if st.button("🔍 Search for AIAgent"):
         st.session_state.pending_prompt = "Search the codebase for 'AIAgent' using search_files('AIAgent')"
 with q4:
-    if st.button(" Recall Memories", use_container_width=True):
+    if st.button("🧠 Recall Memories"):
         st.session_state.pending_prompt = "Recall all stored memories using recall('')"
 
 st.markdown("")
+
 
 # Render Chat Messages
 for msg in st.session_state.messages:

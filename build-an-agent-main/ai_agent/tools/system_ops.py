@@ -1,8 +1,10 @@
+import os
 import subprocess
-import sys
+from pathlib import Path
+from typing import Optional
 
 
-def run_terminal_command(command: str) -> str:
+def run_terminal_command(command: str, cwd: Optional[str] = None) -> str:
     """
     Execute a shell command locally in the workspace directory with timeout safeguards.
     Returns stdout or stderr output.
@@ -10,16 +12,31 @@ def run_terminal_command(command: str) -> str:
     if not command or not command.strip():
         return "Error: Empty command string provided."
 
-    # Prevent extremely dangerous commands if needed
-    forbidden_substrings = ["rm -rf /", "mkfs", "format C:"]
+    # Prevent extremely dangerous commands across OS environments
+    forbidden_substrings = [
+        "rm -rf /",
+        "rm -rf /*",
+        "mkfs",
+        "format c:",
+        "format-volume",
+        "del /s /q c:\\",
+        "rmdir /s /q c:\\",
+        ":(){ :|:& };:",
+    ]
+    command_lower = command.lower()
     for forbidden in forbidden_substrings:
-        if forbidden.lower() in command.lower():
+        if forbidden in command_lower:
             return f"Command execution rejected for safety reasons: {forbidden}"
+
+    working_dir = Path(cwd) if cwd else Path.cwd()
+    if not working_dir.exists():
+        return f"Error: Working directory does not exist: {cwd}"
 
     try:
         process = subprocess.run(
             command,
             shell=True,
+            cwd=str(working_dir),
             capture_output=True,
             text=True,
             timeout=60,  # 60 second timeout limit
@@ -42,3 +59,4 @@ def run_terminal_command(command: str) -> str:
         return f"Error: Command '{command}' timed out after 60 seconds."
     except Exception as err:
         return f"Error executing command '{command}': {err}"
+

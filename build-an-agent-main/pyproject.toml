@@ -19,6 +19,12 @@ dependencies = [
     "streamlit>=1.35.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+
 [project.urls]
 Homepage = "https://github.com/CodeWithIdris/AI_Agent"
 Repository = "https://github.com/CodeWithIdris/AI_Agent"
