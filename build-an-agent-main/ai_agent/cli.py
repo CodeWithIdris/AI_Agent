@@ -76,6 +76,7 @@ def main():
                 print("  /outline [file]    - View AST-based code outline of classes and functions")
                 print("  /symbol [name]     - Search codebase for symbol definitions (class, def, const)")
                 print("  /refs [name]       - Find references and calls to symbol across codebase")
+                print("  /review [path]     - Run automated security vulnerability and code quality audit")
                 print("  /undo              - One-click rollback of the agent's last file modification")
                 print("  /diff              - View live Git diff of workspace changes")
                 print("  /debug [command]   - Run autonomous self-healing debugger (e.g. /debug pytest)")
@@ -129,6 +130,14 @@ def main():
                     ref_name = parts[1].strip()
                     ref_res = agent.tools.execute("find_references", ref_name)
                     print(f"{CYAN}{ref_res}{RESET}\n")
+                continue
+
+            if user_input.lower().startswith("/review"):
+                parts = user_input.split(maxsplit=1)
+                target_p = parts[1].strip() if len(parts) > 1 else "."
+                print(f"{BOLD}{MAGENTA}Running Code Review & Security Audit on `{target_p}`...{RESET}\n")
+                review_report = agent.review_code(target_p)
+                print(f"{CYAN}{review_report}{RESET}\n")
                 continue
 
             if user_input.lower().startswith("/plan"):

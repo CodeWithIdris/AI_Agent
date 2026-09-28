@@ -7,6 +7,7 @@ from .debug_ops import run_tests_with_diagnostics
 from .git_ops import get_git_diff, create_checkpoint, undo_last_change
 from .web_ops import web_search, fetch_webpage
 from .symbol_ops import get_code_outline, find_symbol, find_references
+from .lint_ops import run_code_review
 from .parser import parse_tool_call
 
 
@@ -55,6 +56,7 @@ class ToolRegistry:
         self.register("get_code_outline", get_code_outline)
         self.register("find_symbol", find_symbol)
         self.register("find_references", find_references)
+        self.register("run_code_review", run_code_review)
 
 
 
@@ -193,6 +195,7 @@ __all__ = [
     "get_code_outline",
     "find_symbol",
     "find_references",
+    "run_code_review",
 ]
 
 

@@ -83,8 +83,8 @@ with st.sidebar:
 
 
     # Navigation Tabs
-    tab_memory, tab_search, tab_symbols, tab_files, tab_git, tab_tools = st.tabs(
-        ["🧠 Memory", "🔍 Search", "🧩 Symbols", "📁 Files", "🌿 Git & Diffs", "🛠️ Tools"]
+    tab_memory, tab_search, tab_symbols, tab_review, tab_files, tab_git, tab_tools = st.tabs(
+        ["🧠 Memory", "🔍 Search", "🧩 Symbols", "🛡️ Review", "📁 Files", "🌿 Git & Diffs", "🛠️ Tools"]
     )
 
     # Tab 1: Memory Manager
@@ -178,7 +178,22 @@ with st.sidebar:
                 else:
                     st.warning("Enter a symbol name.")
 
-    # Tab 4: File Explorer
+    # Tab 4: Code Review & Security Linter
+    with tab_review:
+        st.caption("Automated Security & Code Quality Audit")
+        rev_path = st.text_input("Audit Target Path", value=".", placeholder="e.g. ai_agent or .")
+        if st.button("🛡️ Run Security & Quality Audit"):
+            with st.spinner("Scanning codebase for security vulnerabilities..."):
+                report = agent.review_code(rev_path)
+                if "[CLEAN]" in report:
+                    st.success("🎉 Codebase passed all security and quality checks!")
+                elif "[HIGH]" in report:
+                    st.error("⚠️ Security vulnerabilities detected!")
+                else:
+                    st.warning("Issues or anti-patterns detected.")
+                st.text_area("Audit Report", value=report, height=280)
+
+    # Tab 5: File Explorer
     with tab_files:
         st.caption("Workspace File Viewer")
         tree = list_files(".")
@@ -252,7 +267,7 @@ st.divider()
 
 # Quick Prompt Action Chips
 st.markdown("**Quick Actions:**")
-q1, q2, q3, q4, q5, q6, q7 = st.columns(7)
+q1, q2, q3, q4, q5, q6, q7, q8 = st.columns(8)
 
 with q1:
     if st.button("📁 Files"):
@@ -261,18 +276,21 @@ with q2:
     if st.button("🧩 Outline"):
         st.session_state.pending_prompt = "Generate the code outline for ai_agent/agent.py using get_code_outline('ai_agent/agent.py')"
 with q3:
+    if st.button("🛡️ Review"):
+        st.session_state.pending_prompt = "Audit workspace security and code quality using run_code_review('.')"
+with q4:
     if st.button("🌿 Diff"):
         st.session_state.pending_prompt = "Inspect git changes using get_git_diff('.')"
-with q4:
+with q5:
     if st.button("📋 Plan"):
         st.session_state.pending_prompt = "Plan and break down adding an automated test into sequential steps."
-with q5:
+with q6:
     if st.button("🌐 Docs"):
         st.session_state.pending_prompt = "Search the web for 'Python 3.13 changelog features' using web_search('Python 3.13 changelog features')"
-with q6:
+with q7:
     if st.button("🩺 Debug"):
         st.session_state.pending_prompt = "Diagnose the workspace test suite using run_tests_with_diagnostics('pytest') and fix any failing tests."
-with q7:
+with q8:
     if st.button("🧠 Memory"):
         st.session_state.pending_prompt = "Recall all stored memories using recall('')"
 

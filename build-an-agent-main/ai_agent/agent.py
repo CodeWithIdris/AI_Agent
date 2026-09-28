@@ -334,6 +334,11 @@ class AIAgent:
         from .tools.git_ops import get_git_diff
         return get_git_diff()
 
+    def review_code(self, target_path: str = ".") -> str:
+        """Run automated security vulnerability scanning and code quality review."""
+        from .tools.lint_ops import run_code_review
+        return run_code_review(target_path)
+
     def plan_and_execute(
         self,
         goal: str,

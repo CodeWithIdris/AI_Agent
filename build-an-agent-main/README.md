@@ -74,11 +74,13 @@ AI_Agent/
 │       ├── git_ops.py        # Git diffing, checkpoints & time-travel undo
 │       ├── web_ops.py        # Zero-key web search & clean docs extractor
 │       ├── symbol_ops.py     # AST symbol indexing & code outline generator
+│       ├── lint_ops.py       # Static security analysis & code review linter
 │       └── parser.py         # AST parser for LLM tool calls
 ├── tests/                    # Comprehensive Pytest Suite
 │   ├── test_agent.py         # Agent orchestrator unit tests
 │   ├── test_debug.py         # Diagnostic parser and self-healing tests
 │   ├── test_git_ops.py       # Checkpoints and undo rollback tests
+│   ├── test_lint_ops.py      # Security and static linter tests
 │   ├── test_memory.py        # Durable memory manager tests
 │   ├── test_parser.py        # AST tool parser unit tests
 │   ├── test_safety.py        # Guardrails safety mode & cost metric tests
@@ -149,6 +151,7 @@ python main.py
 | `get_code_outline(file_path)` | Generates AST hierarchical outline of classes, methods, docstrings & lines. |
 | `find_symbol(symbol_name, path='.')` | Searches codebase for symbol definitions (class, def, const) with line spans. |
 | `find_references(symbol_name, path='.')` | Locates all calls, usages, and references of a symbol across the project. |
+| `run_code_review(path='.')` | Automated security scanner & linter (detects secrets, eval/exec, shell=True). |
 | `search_files(keyword, path='.')` | Searches workspace codebase files for string patterns (grep). |
 | `create_file(path, content)` | Creates a new file at specified path with given content. |
 | `list_files(path='.')` | Lists directory structure with `[DIR]` and `[FILE]` indicators. |
@@ -170,6 +173,7 @@ python main.py
 | `/outline [file]` | View AST-based code outline of classes, methods, and functions. |
 | `/symbol [name]` | Search codebase for symbol definitions (class, def, const). |
 | `/refs [name]` | Find all calls, imports, and references of a symbol across the project. |
+| `/review [path]` | Run automated security vulnerability and code quality audit. |
 | `/undo` | One-click rollback: reverts the agent's last file modification. |
 | `/diff` | Displays live Git diff showing unstaged/staged workspace modifications. |
 | `/debug [command]` | Triggers autonomous self-healing debugger loop on test suite. |
