@@ -83,7 +83,7 @@ with st.sidebar:
 
 
     # Navigation Tabs
-    tab_memory, tab_search, tab_files, tab_tools = st.tabs(["🧠 Memory", "🔍 Search", "📁 Files", "🛠️ Tools"])
+    tab_memory, tab_search, tab_files, tab_git, tab_tools = st.tabs(["🧠 Memory", "🔍 Search", "📁 Files", "🌿 Git & Diffs", "🛠️ Tools"])
 
     # Tab 1: Memory Manager
     with tab_memory:
@@ -161,7 +161,30 @@ with st.sidebar:
             else:
                 st.warning("Please enter a file path.")
 
-    # Tab 4: Available Tools
+    # Tab 4: Git & Diffs (Time-Travel Safety)
+    with tab_git:
+        st.caption("Git State & Checkpoint Rollback")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("↩️ Undo Last Change"):
+                undo_msg = agent.undo()
+                st.info(undo_msg)
+                st.rerun()
+        with c2:
+            if st.button("🔄 Refresh Diff"):
+                st.rerun()
+
+        st.divider()
+        live_diff = agent.diff()
+        st.code(live_diff, language="diff")
+
+        st.divider()
+        st.markdown("**Session Report**")
+        if st.button("📄 Generate Report"):
+            rep_msg = agent.export_session_report("agent-session-report.md")
+            st.success(rep_msg)
+
+    # Tab 5: Available Tools
     with tab_tools:
         tool_sigs = [s.strip() for s in agent.tools.get_prompt_signatures().split("), ")]
         tool_sigs = [s if s.endswith(")") else f"{s})" for s in tool_sigs if s]
@@ -196,23 +219,27 @@ st.divider()
 
 # Quick Prompt Action Chips
 st.markdown("**Quick Actions:**")
-q1, q2, q3, q4, q5 = st.columns(5)
+q1, q2, q3, q4, q5, q6 = st.columns(6)
 
 with q1:
     if st.button("📁 List Files"):
         st.session_state.pending_prompt = "List all files in the current workspace directory using list_files('.')"
 with q2:
-    if st.button("🌿 Git Status"):
-        st.session_state.pending_prompt = "Run the terminal command 'git status' using run_terminal_command('git status')"
+    if st.button("🌿 Git Diff"):
+        st.session_state.pending_prompt = "Inspect git changes using get_git_diff('.')"
 with q3:
-    if st.button("🔍 Search Code"):
-        st.session_state.pending_prompt = "Search the codebase for 'AIAgent' using search_files('AIAgent')"
+    if st.button("📋 Plan Task"):
+        st.session_state.pending_prompt = "Plan and break down adding an automated test into sequential steps."
 with q4:
+    if st.button("🌐 Web Docs"):
+        st.session_state.pending_prompt = "Search the web for 'Python 3.13 changelog features' using web_search('Python 3.13 changelog features')"
+with q5:
     if st.button("🩺 Auto-Debug"):
         st.session_state.pending_prompt = "Diagnose the workspace test suite using run_tests_with_diagnostics('pytest') and fix any failing tests."
-with q5:
+with q6:
     if st.button("🧠 Recall Memory"):
         st.session_state.pending_prompt = "Recall all stored memories using recall('')"
+
 
 st.markdown("")
 

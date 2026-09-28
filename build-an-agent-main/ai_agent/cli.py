@@ -72,15 +72,50 @@ def main():
             if user_input.lower() == "/help":
                 print(f"{YELLOW}Available Commands:{RESET}")
                 print("  /help              - Display this help message")
+                print("  /plan [goal]       - Run two-phase plan-first autonomous task executor")
+                print("  /undo              - One-click rollback of the agent's last file modification")
+                print("  /diff              - View live Git diff of workspace changes")
                 print("  /debug [command]   - Run autonomous self-healing debugger (e.g. /debug pytest)")
+                print("  /export [path]     - Export executive session transcript and cost report to markdown")
                 print("  /provider [name]   - View active provider or switch (e.g. /provider gemini)")
                 print("  /model [name]      - View or switch active model")
-                print("  /mode [AUTONOMOUS|CONFIRM_DANGEROUS] - View or switch safety mode")
+                print("  /mode [mode]       - View or switch safety mode (AUTONOMOUS or CONFIRM_DANGEROUS)")
                 print("  /tokens            - View session token telemetry and latency")
                 print("  /memory            - Display current durable memory state")
                 print("  /clear             - Clear current conversation history")
                 print("  /exit              - Exit the application\n")
                 continue
+
+            if user_input.lower() == "/undo":
+                print(f"{YELLOW}Reverting last file change...{RESET}")
+                undo_res = agent.undo()
+                print(f"{GREEN}{undo_res}{RESET}\n")
+                continue
+
+            if user_input.lower() == "/diff":
+                print(f"{CYAN}Fetching workspace Git diff...{RESET}")
+                diff_res = agent.diff()
+                print(f"{GREEN}{diff_res}{RESET}\n")
+                continue
+
+            if user_input.lower().startswith("/plan"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2 or not parts[1].strip():
+                    print(f"{YELLOW}Usage: /plan <describe what you want to achieve>{RESET}\n")
+                else:
+                    goal = parts[1].strip()
+                    print(f"{BOLD}{MAGENTA}Starting Two-Phase Plan-First Execution for:{RESET} {goal}\n")
+                    plan_res = agent.plan_and_execute(goal, callback=tool_callback, approval_hook=cli_approval_hook)
+                    print(f"\n{BOLD}{GREEN}Plan-First Result:{RESET}\n{plan_res}\n")
+                continue
+
+            if user_input.lower().startswith("/export"):
+                parts = user_input.split(maxsplit=1)
+                target_f = parts[1].strip() if len(parts) > 1 else "agent-session-report.md"
+                exp_res = agent.export_session_report(target_f)
+                print(f"{GREEN}{exp_res}{RESET}\n")
+                continue
+
 
             if user_input.lower().startswith("/debug"):
                 parts = user_input.split(maxsplit=1)

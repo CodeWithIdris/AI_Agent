@@ -4,6 +4,8 @@ from .file_ops import read_file, list_files, edit_file, delete_file
 from .code_ops import create_file, search_files
 from .system_ops import run_terminal_command
 from .debug_ops import run_tests_with_diagnostics
+from .git_ops import get_git_diff, create_checkpoint, undo_last_change
+from .web_ops import web_search, fetch_webpage
 from .parser import parse_tool_call
 
 
@@ -44,6 +46,12 @@ class ToolRegistry:
         self.register("search_files", search_files)
         self.register("run_terminal_command", run_terminal_command)
         self.register("run_tests_with_diagnostics", run_tests_with_diagnostics)
+        self.register("get_git_diff", get_git_diff)
+        self.register("create_checkpoint", create_checkpoint)
+        self.register("undo_last_change", undo_last_change)
+        self.register("web_search", web_search)
+        self.register("fetch_webpage", fetch_webpage)
+
 
 
     def register(self, name: str, func: Callable) -> None:
@@ -173,6 +181,12 @@ __all__ = [
     "search_files",
     "run_terminal_command",
     "run_tests_with_diagnostics",
+    "get_git_diff",
+    "create_checkpoint",
+    "undo_last_change",
+    "web_search",
+    "fetch_webpage",
 ]
+
 
 

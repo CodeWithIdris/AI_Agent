@@ -187,7 +187,18 @@ class AIAgent:
             if not approved:
                 return f"⚠️ Security Intercept: Execution of tool '{tool_name}' was REJECTED by user in CONFIRM_DANGEROUS mode."
 
+        # Automatic checkpoint snapshot before mutating file tools
+        if tool_name in ("edit_file", "delete_file", "create_file"):
+            target_file = None
+            if isinstance(args, (list, tuple)) and args:
+                target_file = str(args[0])
+            elif isinstance(args, dict):
+                target_file = str(args.get("path") or args.get("file_path", ""))
+            from .tools.git_ops import create_checkpoint
+            create_checkpoint(target_file, description=f"Auto-checkpoint before {tool_name}")
+
         return self.tools.execute(tool_name, args)
+
 
     def process_turn(
         self,
@@ -312,4 +323,97 @@ class AIAgent:
     def clear_history(self) -> None:
         """Clear current conversation history."""
         self.history.clear()
+
+    def undo(self) -> str:
+        """Undo last file modification by restoring previous checkpoint."""
+        from .tools.git_ops import undo_last_change
+        return undo_last_change()
+
+    def diff(self) -> str:
+        """Get current workspace git diff."""
+        from .tools.git_ops import get_git_diff
+        return get_git_diff()
+
+    def plan_and_execute(
+        self,
+        goal: str,
+        callback: Optional[Callable[[str, str, Any, str], None]] = None,
+        approval_hook: Optional[Callable[[str, Any], bool]] = None,
+    ) -> str:
+        """
+        Two-phase Plan-First Execution:
+        Phase 1: Explore and generate structured milestone plan.
+        Phase 2: Systematically execute steps until completion.
+        """
+        plan_prompt = (
+            f"You are operating in PLAN-FIRST mode. The user's goal is:\n\n{goal}\n\n"
+            "PHASE 1 (PLANNING):\n"
+            "1. Inspect workspace structure using `list_files` or `search_files` if needed.\n"
+            "2. Produce a clear, numbered implementation checklist with specific tasks.\n"
+            "Do not execute any code edits yet in this phase. Output the full plan."
+        )
+        plan = self.process_turn(plan_prompt, callback=callback, approval_hook=approval_hook)
+
+        execute_prompt = (
+            "PHASE 2 (EXECUTION):\n"
+            "Now systematically execute the plan step-by-step. Use code tools (`create_file`, `edit_file`, "
+            "`run_terminal_command`, `run_tests_with_diagnostics`) to complete each task.\n"
+            "Verify all changes before finalizing."
+        )
+        execution_result = self.process_turn(execute_prompt, callback=callback, approval_hook=approval_hook, max_steps=15)
+
+        return f"📋 **Implementation Plan**:\n{plan}\n\n---\n\n🚀 **Execution Result**:\n{execution_result}"
+
+    def export_session_report(self, file_path: str = "agent-session-report.md") -> str:
+        """Generate and save an executive Markdown session report."""
+        import datetime
+        from pathlib import Path
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        m = self.metrics
+
+        lines = [
+            "# AI Agent - Session Execution Report 📊",
+            f"*Generated on: {timestamp}*",
+            "",
+            "## ⚙️ Environment & Provider",
+            f"- **Provider**: `{self.provider}`",
+            f"- **Model**: `{self.model}`",
+            f"- **Safety Mode**: `{self.safety_mode}`",
+            "",
+            "## 📈 Telemetry & Usage Metrics",
+            f"- **Total Turns**: {m['turns_count']}",
+            f"- **Prompt Tokens**: {m['prompt_tokens']:,}",
+            f"- **Completion Tokens**: {m['completion_tokens']:,}",
+            f"- **Total Tokens**: {m['total_tokens']:,}",
+            f"- **Estimated Cost**: ${m.get('estimated_cost_usd', 0.0):.6f} USD",
+            f"- **Last Turn Latency**: {m['last_latency_seconds']}s",
+            "",
+            "## 🧠 Active Memories",
+        ]
+
+        memories = self.memory.load()
+        if memories:
+            for k, v in memories.items():
+                lines.append(f"- **{k}**: {v}")
+        else:
+            lines.append("*No durable memories stored.*")
+
+        lines.extend([
+            "",
+            "## 💬 Conversation Transcript",
+            "",
+        ])
+
+        for msg in self.history:
+            role = msg.get("role", "unknown").capitalize()
+            content = msg.get("content", "").strip()
+            lines.append(f"### {role}:")
+            lines.append(content)
+            lines.append("")
+
+        report_content = "\n".join(lines)
+        out_path = Path(file_path)
+        out_path.write_text(report_content, encoding="utf-8")
+        return f"✅ Session report saved to `{out_path.resolve()}` ({len(report_content)} bytes)."
+
 

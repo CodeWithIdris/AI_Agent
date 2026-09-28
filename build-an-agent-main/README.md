@@ -71,14 +71,18 @@ AI_Agent/
 │       ├── code_ops.py       # Code operations (create_file, search_files)
 │       ├── system_ops.py     # System commands (run_terminal_command)
 │       ├── debug_ops.py      # Pytest failure parsing & diagnostic test runner
+│       ├── git_ops.py        # Git diffing, checkpoints & time-travel undo
+│       ├── web_ops.py        # Zero-key web search & clean docs extractor
 │       └── parser.py         # AST parser for LLM tool calls
 ├── tests/                    # Comprehensive Pytest Suite
 │   ├── test_agent.py         # Agent orchestrator unit tests
 │   ├── test_debug.py         # Diagnostic parser and self-healing tests
+│   ├── test_git_ops.py       # Checkpoints and undo rollback tests
 │   ├── test_memory.py        # Durable memory manager tests
 │   ├── test_parser.py        # AST tool parser unit tests
 │   ├── test_safety.py        # Guardrails safety mode & cost metric tests
-│   └── test_tools.py         # Tool registry and I/O execution tests
+│   ├── test_tools.py         # Tool registry and I/O execution tests
+│   └── test_web_ops.py       # Web search and page fetch tests
 ├── app.py                    # Streamlit Web Application Frontend Cockpit
 ├── main.py                   # CLI Entrypoint Script
 ├── pyproject.toml            # Package metadata & pytest configuration
@@ -135,12 +139,17 @@ python main.py
 | :--- | :--- |
 | `run_terminal_command(command)` | Safe execution of terminal shell commands (`python`, `pip`, `git`, etc.). |
 | `run_tests_with_diagnostics(command='pytest')` | Executes test suite, extracts tracebacks, and reports line failures. |
+| `get_git_diff(path='.')` | Generates a clean Git diff of all unstaged and staged workspace changes. |
+| `create_checkpoint(target_file=None, description='...')` | Creates an instantaneous rollback snapshot prior to file modifications. |
+| `undo_last_change(workspace='.')` | Restores workspace files to the previous checkpoint. |
+| `web_search(query, max_results=5)` | Free search without API keys to find answers, docs, and code solutions. |
+| `fetch_webpage(url, max_length=4000)` | Downloads any URL, strips scripts/styling, and returns readable markdown. |
 | `search_files(keyword, path='.')` | Searches workspace codebase files for string patterns (grep). |
 | `create_file(path, content)` | Creates a new file at specified path with given content. |
 | `list_files(path='.')` | Lists directory structure with `[DIR]` and `[FILE]` indicators. |
 | `read_file(path, start_line=1, end_line=None)` | Reads text content safely with line pagination & binary protection. |
-| `edit_file(path, old_str, new_str)` | Replaces text in a file or creates a new file if missing. |
-| `delete_file(path)` | Safely removes a file from the workspace. |
+| `edit_file(path, old_str, new_str)` | Replaces text in a file with automatic checkpoint snapshotting. |
+| `delete_file(path)` | Safely removes a file from the workspace with backup snapshot. |
 | `remember(key, value)` | Stores a key-value pair in persistent memory. |
 | `recall(key='')` | Retrieves a specific memory or dumps all stored memories. |
 | `forget(key)` | Deletes a key-value pair from persistent memory. |
@@ -152,14 +161,19 @@ python main.py
 | Command | Purpose |
 | :--- | :--- |
 | `/help` | Displays available CLI slash commands. |
-| `/mode [AUTONOMOUS\|CONFIRM_DANGEROUS]` | View or toggle execution guardrails mode. |
+| `/plan [goal]` | Two-phase architect planner: inspects workspace, plans milestones, and executes. |
+| `/undo` | One-click rollback: reverts the agent's last file modification. |
+| `/diff` | Displays live Git diff showing unstaged/staged workspace modifications. |
 | `/debug [command]` | Triggers autonomous self-healing debugger loop on test suite. |
+| `/export [path]` | Exports complete session transcript, telemetry, and cost breakdown to Markdown. |
+| `/mode [AUTONOMOUS\|CONFIRM_DANGEROUS]` | View or toggle execution guardrails mode. |
 | `/provider [name]` | View active LLM provider or switch (e.g. `/provider gemini`). |
 | `/model [name]` | View or switch active model on the fly. |
 | `/tokens` | Display token usage, estimated USD cost, and turn latency telemetry. |
 | `/memory` | View stored durable key-value memory state. |
 | `/clear` | Reset current conversation turn history. |
 | `/exit` | Exit the CLI session. |
+
 
 ---
 
