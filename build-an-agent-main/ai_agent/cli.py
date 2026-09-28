@@ -28,6 +28,16 @@ def tool_callback(response: str, tool_name: str, args: list, result: str):
     print(f"{GREEN}[TOOL EXECUTION]{RESET} {tool_name}({formatted_args}) -> {result}")
 
 
+def cli_approval_hook(tool_name: str, args: list) -> bool:
+    """CLI prompt for user approval before executing dangerous tools in CONFIRM_DANGEROUS mode."""
+    formatted_args = ", ".join(repr(a) for a in args)
+    print(f"\n{BOLD}{RED}🛡️ [SAFETY INTERCEPT]{RESET} Agent proposed executing dangerous tool:")
+    print(f"  Tool: {BOLD}{tool_name}{RESET}")
+    print(f"  Args: {formatted_args}")
+    choice = input(f"{YELLOW}Approve execution? [y/N]: {RESET}").strip().lower()
+    return choice in ("y", "yes")
+
+
 def main():
     """Main CLI entry point."""
     print_banner()
@@ -63,8 +73,9 @@ def main():
                 print(f"{YELLOW}Available Commands:{RESET}")
                 print("  /help              - Display this help message")
                 print("  /debug [command]   - Run autonomous self-healing debugger (e.g. /debug pytest)")
-                print("  /provider [name]   - View active provider or switch (e.g. /provider ollama)")
+                print("  /provider [name]   - View active provider or switch (e.g. /provider gemini)")
                 print("  /model [name]      - View or switch active model")
+                print("  /mode [AUTONOMOUS|CONFIRM_DANGEROUS] - View or switch safety mode")
                 print("  /tokens            - View session token telemetry and latency")
                 print("  /memory            - Display current durable memory state")
                 print("  /clear             - Clear current conversation history")
@@ -79,6 +90,18 @@ def main():
                 print(f"\n{BOLD}{GREEN}Debugger Report:{RESET}\n{report}\n")
                 continue
 
+            if user_input.lower().startswith("/mode"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) == 1:
+                    print(f"{CYAN}Active Safety Mode:{RESET} {agent.safety_mode}\n")
+                else:
+                    new_mode = parts[1].strip().upper()
+                    if new_mode in ("AUTONOMOUS", "CONFIRM_DANGEROUS"):
+                        agent.safety_mode = new_mode
+                        print(f"{GREEN}Switched safety mode to '{agent.safety_mode}'{RESET}\n")
+                    else:
+                        print(f"{RED}Invalid mode. Use 'AUTONOMOUS' or 'CONFIRM_DANGEROUS'.{RESET}\n")
+                continue
 
             if user_input.lower().startswith("/provider"):
                 parts = user_input.split(maxsplit=1)
@@ -113,13 +136,15 @@ def main():
                 print(f"  Prompt Tokens:      {m['prompt_tokens']}")
                 print(f"  Completion Tokens:  {m['completion_tokens']}")
                 print(f"  Total Tokens:       {m['total_tokens']}")
-                print(f"  Last Turn Latency:  {m['last_latency_seconds']}s\n")
+                print(f"  Estimated Cost:     ${m['estimated_cost_usd']:.6f} USD")
+                print(f"  Last Turn Latency:  {m['last_latency_seconds']}s")
+                print(f"  Safety Mode:        {agent.safety_mode}\n")
                 continue
 
-
             # Process AI Agent Turn
-            final_response = agent.process_turn(user_input, callback=tool_callback)
+            final_response = agent.process_turn(user_input, callback=tool_callback, approval_hook=cli_approval_hook)
             print(f"{BOLD}{YELLOW}Agent{RESET}: {final_response}\n")
+
 
         except KeyboardInterrupt:
             print(f"\n{YELLOW}Session ended by user. Goodbye!{RESET}")

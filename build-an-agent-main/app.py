@@ -65,8 +65,21 @@ with st.sidebar:
             except Exception as e:
                 st.error(str(e))
 
-    st.caption(f"Active: `{agent.provider}` ({agent.model})")
+    with st.expander("🛡️ Guardrails & Safety Mode", expanded=True):
+        safety_opt = st.radio(
+            "Execution Guardrails",
+            options=["AUTONOMOUS", "CONFIRM_DANGEROUS"],
+            index=0 if agent.safety_mode == "AUTONOMOUS" else 1,
+            format_func=lambda x: "⚡ Autonomous (Execute Immediately)" if x == "AUTONOMOUS" else "🛡️ Safe Mode (Confirm Commands & File Edits)",
+            help="Safe Mode intercepts terminal commands and file modifications before execution.",
+        )
+        if safety_opt != agent.safety_mode:
+            agent.safety_mode = safety_opt
+            st.rerun()
+
+    st.caption(f"Active: `{agent.provider}` ({agent.model}) | Mode: `{agent.safety_mode}`")
     st.divider()
+
 
 
     # Navigation Tabs
@@ -170,11 +183,13 @@ prov_name = Config.PROVIDERS.get(agent.provider, {}).get("name", agent.provider)
 st.caption(f"Autonomous Coding & Workspace Assistant powered by **{prov_name}** (`{model_short_name}`)")
 
 # Stat Metrics Row
-m1, m2, m3, m4 = st.columns(4)
+m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Provider", prov_name)
 m2.metric("Active Model", model_short_name)
 m3.metric("Tokens Consumed", f"{agent.metrics['total_tokens']:,}")
-m4.metric("Durable Memories", f"{len(memories_dict)} Items")
+m4.metric("Est. Cost", f"${agent.metrics.get('estimated_cost_usd', 0.0):.4f} USD")
+mode_label = "🛡️ Safe" if agent.safety_mode == "CONFIRM_DANGEROUS" else "⚡ Autonomous"
+m5.metric("Guardrails", mode_label)
 
 
 st.divider()
@@ -231,14 +246,19 @@ if user_input:
 
         def ui_callback(response: str, tool_name: str, args: list, result: str):
             turn_tools.append({"name": tool_name, "args": args, "result": result})
-            with st.status(f"Executing `{tool_name}`...", expanded=False) as status:
+            is_intercept = "Security Intercept" in result
+            box_label = f"🛡️ Intercepted `{tool_name}`" if is_intercept else f"Executed `{tool_name}`"
+            with st.status(f"Processing `{tool_name}`...", expanded=is_intercept) as status:
                 st.write(f"**Arguments**: `{args}`")
                 st.code(result, language="text")
-                status.update(label=f"Executed `{tool_name}`", state="complete")
+                status.update(label=box_label, state="error" if is_intercept else "complete")
+
+        def st_approval_hook(tool_name: str, args: Any) -> bool:
+            return False
 
         with st.spinner("Agent thinking..."):
             try:
-                final_response = agent.process_turn(user_input, callback=ui_callback)
+                final_response = agent.process_turn(user_input, callback=ui_callback, approval_hook=st_approval_hook)
                 st.markdown(final_response)
 
                 st.session_state.messages.append({
@@ -249,3 +269,4 @@ if user_input:
                 st.rerun()
             except Exception as err:
                 st.error(f"Error processing request: {err}")
+

@@ -1,6 +1,8 @@
+import os
 import json
 import time
 from typing import List, Dict, Any, Tuple, Optional, Callable
+
 import openai
 from openai import OpenAI
 
@@ -15,12 +17,15 @@ class AIAgent:
     dynamic tool calls, execution telemetry, and durable memory.
     """
 
+    DANGEROUS_TOOLS = {"run_terminal_command", "edit_file", "delete_file", "create_file"}
+
     def __init__(
         self,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
+        safety_mode: Optional[str] = None,
         memory_manager: Optional[MemoryManager] = None,
     ):
         # Resolve configuration for provider
@@ -37,6 +42,7 @@ class AIAgent:
         self.model = self.cfg["model"]
         self.base_url = self.cfg["base_url"]
         self.api_key = self.cfg["api_key"]
+        self.safety_mode = (safety_mode or os.getenv("AGENT_SAFETY_MODE", "AUTONOMOUS")).upper()
 
         self._init_client()
 
@@ -55,9 +61,11 @@ class AIAgent:
             "prompt_tokens": 0,
             "completion_tokens": 0,
             "total_tokens": 0,
+            "estimated_cost_usd": 0.0,
             "turns_count": 0,
             "last_latency_seconds": 0.0,
         }
+
 
     def _init_client(self) -> None:
         """Initialize or re-initialize OpenAI-compatible client."""
@@ -127,11 +135,16 @@ class AIAgent:
                 )
                 self.metrics["last_latency_seconds"] = round(time.perf_counter() - start_time, 2)
 
-                # Track token usage if reported by provider
+                # Track token usage and cost if reported by provider
                 if hasattr(completion, "usage") and completion.usage:
-                    self.metrics["prompt_tokens"] += getattr(completion.usage, "prompt_tokens", 0) or 0
-                    self.metrics["completion_tokens"] += getattr(completion.usage, "completion_tokens", 0) or 0
-                    self.metrics["total_tokens"] += getattr(completion.usage, "total_tokens", 0) or 0
+                    p_tok = getattr(completion.usage, "prompt_tokens", 0) or 0
+                    c_tok = getattr(completion.usage, "completion_tokens", 0) or 0
+                    self.metrics["prompt_tokens"] += p_tok
+                    self.metrics["completion_tokens"] += c_tok
+                    self.metrics["total_tokens"] += (p_tok + c_tok)
+                    self.metrics["estimated_cost_usd"] = Config.calculate_cost(
+                        self.model, self.metrics["prompt_tokens"], self.metrics["completion_tokens"]
+                    )
 
                 msg = completion.choices[0].message
                 content = (msg.content or "").strip()
@@ -157,15 +170,36 @@ class AIAgent:
 
         raise Exception(f"API endpoint connection error after {max_retries} attempts: {last_error}")
 
+    def _execute_tool_with_safety(
+        self,
+        tool_name: str,
+        args: Any,
+        approval_hook: Optional[Callable[[str, Any], bool]] = None,
+    ) -> str:
+        """Execute tool if registered and authorized by current safety mode."""
+        if tool_name in self.DANGEROUS_TOOLS and self.safety_mode == "CONFIRM_DANGEROUS":
+            approved = False
+            if approval_hook:
+                try:
+                    approved = approval_hook(tool_name, args)
+                except Exception:
+                    approved = False
+            if not approved:
+                return f"⚠️ Security Intercept: Execution of tool '{tool_name}' was REJECTED by user in CONFIRM_DANGEROUS mode."
+
+        return self.tools.execute(tool_name, args)
+
     def process_turn(
         self,
         user_input: str,
         callback: Optional[Callable[[str, str, Any, str], None]] = None,
+        approval_hook: Optional[Callable[[str, Any], bool]] = None,
         max_steps: int = 15,
     ) -> str:
         """
         Process a user message through the agent tool-execution loop.
         If a callback is provided, it receives status updates (response, tool_name, args, result).
+        If approval_hook is provided, it intercepts dangerous tool calls when in CONFIRM_DANGEROUS mode.
         """
         self.history.append({"role": "user", "content": user_input})
         self.metrics["turns_count"] += 1
@@ -187,7 +221,7 @@ class AIAgent:
             if native_tool_calls:
                 for tool_name, args in native_tool_calls:
                     if self.tools.is_registered(tool_name):
-                        result = self.tools.execute(tool_name, args)
+                        result = self._execute_tool_with_safety(tool_name, args, approval_hook=approval_hook)
                         response_str = content or f"Calling `{tool_name}`..."
                         if callback:
                             callback(response_str, tool_name, args, result)
@@ -198,7 +232,7 @@ class AIAgent:
             # Strategy B: Check Parsed Tool Calls from content string (AST / JSON / Markdown)
             tool_name, args = parse_tool_call(content)
             if tool_name and self.tools.is_registered(tool_name):
-                result = self.tools.execute(tool_name, args)
+                result = self._execute_tool_with_safety(tool_name, args, approval_hook=approval_hook)
                 if callback:
                     callback(content, tool_name, args, result)
                 self.history.append({"role": "assistant", "content": content})
@@ -209,13 +243,14 @@ class AIAgent:
             # If model hallucinated conversational text refusing to call a tool, parse explicit tool calls directly from user prompt!
             prompt_tool_name, prompt_args = parse_tool_call(user_input)
             if step_count == 1 and prompt_tool_name and self.tools.is_registered(prompt_tool_name):
-                result = self.tools.execute(prompt_tool_name, prompt_args)
+                result = self._execute_tool_with_safety(prompt_tool_name, prompt_args, approval_hook=approval_hook)
                 fallback_resp = f"Executing requested tool `{prompt_tool_name}`..."
                 if callback:
                     callback(fallback_resp, prompt_tool_name, prompt_args, result)
                 self.history.append({"role": "assistant", "content": fallback_resp})
                 self.history.append({"role": "user", "content": f"Tool result for {prompt_tool_name}: {result}"})
                 continue
+
 
             # If no tool call detected in any strategy, return final conversational output
             final_response = content or "Task completed."

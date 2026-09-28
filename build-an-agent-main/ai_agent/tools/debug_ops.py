@@ -10,7 +10,7 @@ def parse_pytest_failures(output: str) -> List[Dict[str, Any]]:
     failures = []
 
     # Split output by pytest failure headers: _________________ test_name _________________
-    parts = re.split(r"(?:^|\n)\s*_{5,}\s*([^\s_]+)\s*_{5,}", output)
+    parts = re.split(r"(?:^|\n)\s*_{5,}\s*(\S+?)\s*_{5,}", output)
 
     if len(parts) > 1:
         for i in range(1, len(parts), 2):

@@ -72,6 +72,32 @@ class Config:
             ],
             "requires_key": True,
         },
+        "gemini": {
+            "name": "Google Gemini",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "env_key": "GEMINI_API_KEY",
+            "default_model": "gemini-2.5-flash",
+            "recommended_models": [
+                "gemini-2.5-flash",
+                "gemini-2.5-pro",
+                "gemini-2.0-flash",
+            ],
+            "requires_key": True,
+        },
+    }
+
+    # Estimated pricing per 1,000,000 tokens (prompt_cost_usd, completion_cost_usd)
+    COST_PER_MILLION_TOKENS: Dict[str, Tuple[float, float]] = {
+        "gpt-4o-mini": (0.15, 0.60),
+        "gpt-4o": (2.50, 10.00),
+        "o3-mini": (1.10, 4.40),
+        "deepseek-chat": (0.14, 0.28),
+        "deepseek-coder": (0.14, 0.28),
+        "llama-3.3-70b-versatile": (0.59, 0.79),
+        "llama-3.1-8b-instant": (0.05, 0.08),
+        "gemini-2.5-flash": (0.075, 0.30),
+        "gemini-2.5-pro": (1.25, 5.00),
+        "gemini-2.0-flash": (0.10, 0.40),
     }
 
     DEFAULT_PROVIDER: str = os.getenv("AGENT_PROVIDER", "huggingface")
@@ -82,8 +108,17 @@ class Config:
         or os.getenv("OPENAI_API_KEY")
         or os.getenv("DEEPSEEK_API_KEY")
         or os.getenv("GROQ_API_KEY")
+        or os.getenv("GEMINI_API_KEY")
         or ""
     )
+
+    @classmethod
+    def calculate_cost(cls, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+        """Calculate estimated USD cost based on token counts and model pricing rates."""
+        rates = cls.COST_PER_MILLION_TOKENS.get(model, (0.0, 0.0))
+        cost = (prompt_tokens / 1_000_000 * rates[0]) + (completion_tokens / 1_000_000 * rates[1])
+        return round(cost, 6)
+
 
     MEMORY_FILE: Path = Path(os.getenv("AGENT_MEMORY_FILE", ".agent-memory.json"))
     DEFAULT_WORKSPACE: Path = Path(".")
