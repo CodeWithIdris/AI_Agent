@@ -62,6 +62,7 @@ def main():
             if user_input.lower() == "/help":
                 print(f"{YELLOW}Available Commands:{RESET}")
                 print("  /help              - Display this help message")
+                print("  /debug [command]   - Run autonomous self-healing debugger (e.g. /debug pytest)")
                 print("  /provider [name]   - View active provider or switch (e.g. /provider ollama)")
                 print("  /model [name]      - View or switch active model")
                 print("  /tokens            - View session token telemetry and latency")
@@ -69,6 +70,15 @@ def main():
                 print("  /clear             - Clear current conversation history")
                 print("  /exit              - Exit the application\n")
                 continue
+
+            if user_input.lower().startswith("/debug"):
+                parts = user_input.split(maxsplit=1)
+                cmd = parts[1].strip() if len(parts) > 1 else "pytest"
+                print(f"{MAGENTA}Starting Autonomous Self-Healing Debugger on `{cmd}`...{RESET}\n")
+                report = agent.auto_debug(command=cmd, callback=tool_callback)
+                print(f"\n{BOLD}{GREEN}Debugger Report:{RESET}\n{report}\n")
+                continue
+
 
             if user_input.lower().startswith("/provider"):
                 parts = user_input.split(maxsplit=1)

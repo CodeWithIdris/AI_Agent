@@ -181,22 +181,26 @@ st.divider()
 
 # Quick Prompt Action Chips
 st.markdown("**Quick Actions:**")
-q1, q2, q3, q4 = st.columns(4)
+q1, q2, q3, q4, q5 = st.columns(5)
 
 with q1:
-    if st.button("📁 List Workspace Files"):
+    if st.button("📁 List Files"):
         st.session_state.pending_prompt = "List all files in the current workspace directory using list_files('.')"
 with q2:
-    if st.button("🌿 Run Git Status"):
+    if st.button("🌿 Git Status"):
         st.session_state.pending_prompt = "Run the terminal command 'git status' using run_terminal_command('git status')"
 with q3:
-    if st.button("🔍 Search for AIAgent"):
+    if st.button("🔍 Search Code"):
         st.session_state.pending_prompt = "Search the codebase for 'AIAgent' using search_files('AIAgent')"
 with q4:
-    if st.button("🧠 Recall Memories"):
+    if st.button("🩺 Auto-Debug"):
+        st.session_state.pending_prompt = "Diagnose the workspace test suite using run_tests_with_diagnostics('pytest') and fix any failing tests."
+with q5:
+    if st.button("🧠 Recall Memory"):
         st.session_state.pending_prompt = "Recall all stored memories using recall('')"
 
 st.markdown("")
+
 
 
 # Render Chat Messages

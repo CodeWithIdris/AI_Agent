@@ -3,6 +3,7 @@ from typing import Callable, Dict, Any, Tuple, List, Optional, get_origin, get_a
 from .file_ops import read_file, list_files, edit_file, delete_file
 from .code_ops import create_file, search_files
 from .system_ops import run_terminal_command
+from .debug_ops import run_tests_with_diagnostics
 from .parser import parse_tool_call
 
 
@@ -42,6 +43,8 @@ class ToolRegistry:
         self.register("create_file", create_file)
         self.register("search_files", search_files)
         self.register("run_terminal_command", run_terminal_command)
+        self.register("run_tests_with_diagnostics", run_tests_with_diagnostics)
+
 
     def register(self, name: str, func: Callable) -> None:
         """Register a Python callable as a named tool."""
@@ -169,5 +172,7 @@ __all__ = [
     "create_file",
     "search_files",
     "run_terminal_command",
+    "run_tests_with_diagnostics",
 ]
+
 

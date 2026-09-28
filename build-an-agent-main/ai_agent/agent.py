@@ -226,6 +226,55 @@ class AIAgent:
         self.history.append({"role": "assistant", "content": fallback_msg})
         return fallback_msg
 
+    def auto_debug(
+        self,
+        command: str = "pytest",
+        max_iterations: int = 3,
+        callback: Optional[Callable[[str, str, Any, str], None]] = None,
+    ) -> str:
+        """
+        Autonomous self-healing loop:
+        1. Runs test diagnostics.
+        2. If failing, feeds the diagnostics to the agent with instructions to read, edit, and fix the bug.
+        3. Repeats until tests pass or max iterations reached.
+        """
+        from .tools.debug_ops import run_tests_with_diagnostics
+
+        initial_diag = run_tests_with_diagnostics(command)
+        if "✅ SUCCESS" in initial_diag:
+            return f"🎉 Tests are already passing!\n\n{initial_diag}"
+
+        repair_log = [f"🩺 **Autonomous Debugger started for `{command}`**:\n\n{initial_diag}"]
+        iteration = 0
+
+        while iteration < max_iterations:
+            iteration += 1
+            prompt = (
+                f"AUTONOMOUS SELF-HEALING DEBUGGER (Attempt {iteration}/{max_iterations}):\n"
+                f"The test suite command `{command}` failed with the following diagnostic report:\n"
+                f"{initial_diag}\n\n"
+                "Please inspect the failing source code using `read_file`, locate the root cause, "
+                "and apply the exact correction using `edit_file`."
+            )
+
+            # Process the repair turn
+            agent_response = self.process_turn(prompt, callback=callback, max_steps=8)
+            repair_log.append(f"**Attempt {iteration} Action:**\n{agent_response}")
+
+            # Re-run diagnostics
+            check_diag = run_tests_with_diagnostics(command)
+            if "✅ SUCCESS" in check_diag:
+                repair_log.append(f"\n🎉 **Self-Healing Succeeded on Attempt {iteration}!**\n{check_diag}")
+                return "\n\n---\n\n".join(repair_log)
+            else:
+                initial_diag = check_diag
+
+        repair_log.append(
+            f"\n⚠️ **Self-Healing reached maximum attempts ({max_iterations})**. Remaining issues:\n{initial_diag}"
+        )
+        return "\n\n---\n\n".join(repair_log)
+
     def clear_history(self) -> None:
         """Clear current conversation history."""
         self.history.clear()
+
