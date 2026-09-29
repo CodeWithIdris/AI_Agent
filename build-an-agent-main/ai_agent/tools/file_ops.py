@@ -68,10 +68,22 @@ def edit_file(path: str, old_str: str, new_str: str) -> str:
             return f"Created new file: {path}"
 
         content = file_path.read_text(encoding="utf-8")
-        if old_str not in content:
-            return f"Target text {repr(old_str)} not found in '{path}'"
+        if old_str in content:
+            updated = content.replace(old_str, new_str, 1)
+        else:
+            # Fallback: normalize line endings (\r\n vs \n) for cross-platform compatibility
+            content_normalized = content.replace("\r\n", "\n")
+            old_str_normalized = old_str.replace("\r\n", "\n")
+            new_str_normalized = new_str.replace("\r\n", "\n")
 
-        updated = content.replace(old_str, new_str, 1)
+            if old_str_normalized not in content_normalized:
+                return f"Target text {repr(old_str)} not found in '{path}'"
+
+            # Restore original CRLF endings if file predominantly used them
+            is_crlf = "\r\n" in content
+            updated_norm = content_normalized.replace(old_str_normalized, new_str_normalized, 1)
+            updated = updated_norm.replace("\n", "\r\n") if is_crlf else updated_norm
+
         file_path.write_text(updated, encoding="utf-8")
         return f"Successfully updated '{path}'"
     except Exception as err:

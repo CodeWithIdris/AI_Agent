@@ -101,13 +101,13 @@ class AIAgent:
     def build_system_prompt(self) -> str:
         """Construct dynamic system prompt with registered tool signatures and live memory dump."""
         live_memory = self.memory.recall()
-        signatures = self.tools.get_prompt_signatures()
+        signatures = self.tools.get_prompt_signatures(include_doc=True)
         tool_count = len(self.tools.registered_tools)
 
         return (
             "You are a professional AI software engineer and autonomous assistant created by Idris (https://github.com/CodeWithIdris). "
-            f"You have full access to these {tool_count} system tools: "
-            f"{signatures}. "
+            f"You have full access to these {tool_count} system tools:\n"
+            f"{signatures}\n\n"
             "When the user asks you to perform a task, inspect code, run terminal commands, manage files, or manage memories, "
             "reply ONLY with a valid tool call (e.g. recall('') or list_files('.') or run_terminal_command('git status')). "
             f"Do NOT claim you lack access to tools — all {tool_count} tools are fully registered and active in your execution environment. "
@@ -212,6 +212,7 @@ class AIAgent:
         If a callback is provided, it receives status updates (response, tool_name, args, result).
         If approval_hook is provided, it intercepts dangerous tool calls when in CONFIRM_DANGEROUS mode.
         """
+        initial_history_len = len(self.history)
         self.history.append({"role": "user", "content": user_input})
         self.metrics["turns_count"] += 1
         step_count = 0
@@ -221,8 +222,7 @@ class AIAgent:
             try:
                 content, native_tool_calls = self.run_inference()
             except Exception as err:
-                if self.history and self.history[-1]["role"] == "user":
-                    self.history.pop()
+                self.history = self.history[:initial_history_len]
                 return (
                     f"⚠️ **Connection Error** with provider `{self.provider}` ({self.model}). "
                     f"\n\n*Details*: `{err}`\n\nPlease check your provider configuration or connection."
@@ -277,12 +277,14 @@ class AIAgent:
         command: str = "pytest",
         max_iterations: int = 3,
         callback: Optional[Callable[[str, str, Any, str], None]] = None,
+        isolate_history: bool = True,
     ) -> str:
         """
         Autonomous self-healing loop:
         1. Runs test diagnostics.
         2. If failing, feeds the diagnostics to the agent with instructions to read, edit, and fix the bug.
         3. Repeats until tests pass or max iterations reached.
+        If isolate_history=True, intermediate debug turns do not clutter the main agent conversation history.
         """
         from .tools.debug_ops import run_tests_with_diagnostics
 
@@ -290,8 +292,10 @@ class AIAgent:
         if "✅ SUCCESS" in initial_diag:
             return f"🎉 Tests are already passing!\n\n{initial_diag}"
 
+        saved_history = list(self.history) if isolate_history else None
         repair_log = [f"🩺 **Autonomous Debugger started for `{command}`**:\n\n{initial_diag}"]
         iteration = 0
+        final_summary = ""
 
         while iteration < max_iterations:
             iteration += 1
@@ -311,14 +315,24 @@ class AIAgent:
             check_diag = run_tests_with_diagnostics(command)
             if "✅ SUCCESS" in check_diag:
                 repair_log.append(f"\n🎉 **Self-Healing Succeeded on Attempt {iteration}!**\n{check_diag}")
-                return "\n\n---\n\n".join(repair_log)
+                final_summary = "\n\n---\n\n".join(repair_log)
+                break
             else:
                 initial_diag = check_diag
 
-        repair_log.append(
-            f"\n⚠️ **Self-Healing reached maximum attempts ({max_iterations})**. Remaining issues:\n{initial_diag}"
-        )
-        return "\n\n---\n\n".join(repair_log)
+        if not final_summary:
+            repair_log.append(
+                f"\n⚠️ **Self-Healing reached maximum attempts ({max_iterations})**. Remaining issues:\n{initial_diag}"
+            )
+            final_summary = "\n\n---\n\n".join(repair_log)
+
+        if isolate_history and saved_history is not None:
+            self.history = saved_history
+            self.history.append({"role": "user", "content": f"/debug {command}"})
+            status = "succeeded" if "🎉" in final_summary else "reached maximum attempts"
+            self.history.append({"role": "assistant", "content": f"Self-healing debugger {status} for `{command}`."})
+
+        return final_summary
 
     def clear_history(self) -> None:
         """Clear current conversation history."""

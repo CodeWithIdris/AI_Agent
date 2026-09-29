@@ -167,13 +167,22 @@ class ToolRegistry:
 
         return schemas
 
-    def get_prompt_signatures(self) -> str:
-        """Return human-readable tool signatures dynamically for system prompt inclusion."""
+    def get_prompt_signatures(self, include_doc: bool = False) -> str:
+        """
+        Return human-readable tool signatures dynamically for system prompt inclusion.
+        When include_doc=True, appends a concise 1-line description of each tool.
+        """
         signatures = []
         for name, func in self._tools.items():
             sig = inspect.signature(func)
-            signatures.append(f"{name}{sig}")
-        return ", ".join(signatures)
+            if include_doc:
+                doc = inspect.getdoc(func) or ""
+                summary = doc.strip().split("\n\n")[0].replace("\n", " ").strip()
+                desc_suffix = f" - {summary}" if summary else ""
+                signatures.append(f"{name}{sig}{desc_suffix}")
+            else:
+                signatures.append(f"{name}{sig}")
+        return "\n".join(f"- {s}" for s in signatures) if include_doc else ", ".join(signatures)
 
 
 __all__ = [

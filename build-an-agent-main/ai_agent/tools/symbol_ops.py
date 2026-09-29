@@ -48,6 +48,65 @@ def _format_args(args_node: ast.arguments) -> str:
     return ", ".join(params)
 
 
+def _build_ast_outline(tree: ast.Module) -> Tuple[int, List[str]]:
+    """Traverse AST module body and format class, function, and constant outlines."""
+    entries = []
+    found_symbols = 0
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            found_symbols += 1
+            bases = [ast.unparse(b) for b in node.bases]
+            bases_str = f"({', '.join(bases)})" if bases else ""
+            end_line = getattr(node, "end_lineno", node.lineno)
+            doc = ast.get_docstring(node)
+            doc_str = f" - \"{doc.splitlines()[0]}\"" if doc else ""
+            entries.append(
+                f"\n  class {node.name}{bases_str} [Lines {node.lineno}-{end_line}]{doc_str}"
+            )
+
+            # Class methods & attributes
+            for subnode in node.body:
+                if isinstance(subnode, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    prefix = "async def" if isinstance(subnode, ast.AsyncFunctionDef) else "def"
+                    m_args = _format_args(subnode.args)
+                    m_end = getattr(subnode, "end_lineno", subnode.lineno)
+                    m_doc = ast.get_docstring(subnode)
+                    m_doc_str = f" - \"{m_doc.splitlines()[0]}\"" if m_doc else ""
+                    ret = f" -> {ast.unparse(subnode.returns)}" if subnode.returns else ""
+                    entries.append(
+                        f"    |-- {prefix} {subnode.name}({m_args}){ret} [Lines {subnode.lineno}-{m_end}]{m_doc_str}"
+                    )
+
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            found_symbols += 1
+            prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+            f_args = _format_args(node.args)
+            f_end = getattr(node, "end_lineno", node.lineno)
+            doc = ast.get_docstring(node)
+            doc_str = f" - \"{doc.splitlines()[0]}\"" if doc else ""
+            ret = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+            entries.append(
+                f"  {prefix} {node.name}({f_args}){ret} [Lines {node.lineno}-{f_end}]{doc_str}"
+            )
+
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            target_names = []
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        target_names.append(target.id)
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                target_names.append(node.target.id)
+
+            for t_name in target_names:
+                if t_name.isupper() or t_name.startswith("__"):
+                    found_symbols += 1
+                    entries.append(f"  const {t_name} [Line {node.lineno}]")
+
+    return found_symbols, entries
+
+
 def get_code_outline(file_path: str) -> str:
     """
     Generate an AST-based hierarchical code outline of classes, methods, functions,
@@ -67,11 +126,7 @@ def get_code_outline(file_path: str) -> str:
     # Non-python fallback outlines
     if p.suffix.lower() == ".md":
         lines = source.splitlines()
-        headings = []
-        for idx, line in enumerate(lines, start=1):
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                headings.append(f"Line {idx:4d} | {stripped}")
+        headings = [f"Line {i:4d} | {l.strip()}" for i, l in enumerate(lines, 1) if l.strip().startswith("#")]
         if not headings:
             return f"Markdown outline for '{file_path}': No headings found."
         return f"Markdown Outline for '{file_path}':\n" + "\n".join(headings)
@@ -88,65 +143,12 @@ def get_code_outline(file_path: str) -> str:
     except Exception as parse_err:
         return f"Error parsing AST for '{file_path}': {parse_err}"
 
-    outline_entries: List[str] = [f"Code Outline for `{p.as_posix()}`:"]
-    found_symbols = 0
-
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            found_symbols += 1
-            bases = [ast.unparse(b) for b in node.bases]
-            bases_str = f"({', '.join(bases)})" if bases else ""
-            end_line = getattr(node, "end_lineno", node.lineno)
-            doc = ast.get_docstring(node)
-            doc_str = f" - \"{doc.splitlines()[0]}\"" if doc else ""
-            outline_entries.append(
-                f"\n  class {node.name}{bases_str} [Lines {node.lineno}-{end_line}]{doc_str}"
-            )
-
-            # Class methods & attributes
-            for subnode in node.body:
-                if isinstance(subnode, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    prefix = "async def" if isinstance(subnode, ast.AsyncFunctionDef) else "def"
-                    m_args = _format_args(subnode.args)
-                    m_end = getattr(subnode, "end_lineno", subnode.lineno)
-                    m_doc = ast.get_docstring(subnode)
-                    m_doc_str = f" - \"{m_doc.splitlines()[0]}\"" if m_doc else ""
-                    ret = f" -> {ast.unparse(subnode.returns)}" if subnode.returns else ""
-                    outline_entries.append(
-                        f"    |-- {prefix} {subnode.name}({m_args}){ret} [Lines {subnode.lineno}-{m_end}]{m_doc_str}"
-                    )
-
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            found_symbols += 1
-            prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
-            f_args = _format_args(node.args)
-            f_end = getattr(node, "end_lineno", node.lineno)
-            doc = ast.get_docstring(node)
-            doc_str = f" - \"{doc.splitlines()[0]}\"" if doc else ""
-            ret = f" -> {ast.unparse(node.returns)}" if node.returns else ""
-            outline_entries.append(
-                f"  {prefix} {node.name}({f_args}){ret} [Lines {node.lineno}-{f_end}]{doc_str}"
-            )
-
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            # Record significant module-level constants (e.g. ALL_CAPS or __all__)
-            target_names = []
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        target_names.append(target.id)
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-                target_names.append(node.target.id)
-
-            for t_name in target_names:
-                if t_name.isupper() or t_name.startswith("__"):
-                    found_symbols += 1
-                    outline_entries.append(f"  const {t_name} [Line {node.lineno}]")
-
+    found_symbols, entries = _build_ast_outline(tree)
     if found_symbols == 0:
         return f"File '{file_path}' parsed successfully, but contains no top-level classes or functions."
 
-    return "\n".join(outline_entries)
+    header = f"Code Outline for `{p.as_posix()}`:"
+    return header + "\n" + "\n".join(entries)
 
 
 def find_symbol(symbol_name: str, path: str = ".") -> str:

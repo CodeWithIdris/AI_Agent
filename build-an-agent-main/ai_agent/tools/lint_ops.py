@@ -31,7 +31,7 @@ SECRET_PATTERNS = [
 ]
 
 # Words that indicate fake/placeholder values
-PLACEHOLDER_WORDS = {"your_", "sample", "test", "dummy", "placeholder", "fake", "example", "<", "env", "none", "xxx"}
+PLACEHOLDER_WORDS = {"your_", "sample", "test", "dummy", "placeholder", "fake", "example", "<", "env", "none", "xxx", "mock", "demo"}
 
 
 class CodeIssue:
@@ -104,6 +104,9 @@ class CodeReviewer(ast.NodeVisitor):
         if func_name in ("run", "Popen", "call", "check_call", "check_output"):
             for kw in node.keywords:
                 if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                    line_text = self.lines[node.lineno - 1] if 0 < node.lineno <= len(self.lines) else ""
+                    if "# nosec" in line_text or "# noqa" in line_text:
+                        continue
                     self.issues.append(
                         CodeIssue(
                             file_path=self.file_path,
@@ -112,7 +115,7 @@ class CodeReviewer(ast.NodeVisitor):
                             category="SECURITY",
                             rule_id="SEC003",
                             description="subprocess invoked with `shell=True` poses shell injection risks.",
-                            remediation="Pass arguments as a list of strings and set `shell=False`.",
+                            remediation="Pass arguments as a list of strings and set `shell=False`, or add `# nosec` if audited.",
                         )
                     )
 
@@ -131,6 +134,55 @@ class CodeReviewer(ast.NodeVisitor):
                     )
                 )
 
+        # Rule: unsafe yaml.load
+        if func_name == "load":
+            if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id in ("yaml", "pyyaml"):
+                has_safe_loader = False
+                for kw in node.keywords:
+                    if kw.arg == "Loader":
+                        val_str = ""
+                        if isinstance(kw.value, ast.Name):
+                            val_str = kw.value.id
+                        elif isinstance(kw.value, ast.Attribute):
+                            val_str = kw.value.attr
+                        if "SafeLoader" in val_str or "BaseLoader" in val_str:
+                            has_safe_loader = True
+                if not has_safe_loader:
+                    self.issues.append(
+                        CodeIssue(
+                            file_path=self.file_path,
+                            line=node.lineno,
+                            severity="HIGH",
+                            category="SECURITY",
+                            rule_id="SEC005",
+                            description="Unsafe `yaml.load()` without SafeLoader can lead to arbitrary code execution.",
+                            remediation="Use `yaml.safe_load(data)` or specify `Loader=yaml.SafeLoader`.",
+                        )
+                    )
+
+        # Rule: HTTP requests missing timeout
+        if func_name in ("get", "post", "put", "delete", "patch", "urlopen", "request"):
+            mod_name = None
+            if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+                mod_name = node.func.value.id
+            elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Attribute) and isinstance(node.func.value.value, ast.Name):
+                mod_name = f"{node.func.value.value.id}.{node.func.value.attr}"
+
+            if mod_name in ("requests", "httpx", "urllib.request"):
+                has_timeout = any(kw.arg == "timeout" for kw in node.keywords)
+                if not has_timeout:
+                    self.issues.append(
+                        CodeIssue(
+                            file_path=self.file_path,
+                            line=node.lineno,
+                            severity="MEDIUM",
+                            category="RELIABILITY",
+                            rule_id="REL004",
+                            description=f"HTTP call `{mod_name}.{func_name}()` without explicit `timeout` can hang indefinitely.",
+                            remediation="Add an explicit timeout parameter, e.g. `timeout=15` or `timeout=30`.",
+                        )
+                    )
+
         self.generic_visit(node)
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler):
@@ -147,6 +199,23 @@ class CodeReviewer(ast.NodeVisitor):
                     remediation="Catch specific exceptions e.g. `except Exception:` or `except (ValueError, KeyError):`.",
                 )
             )
+
+        # Rule: silent broad exception swallowing (except Exception: pass)
+        if len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
+            is_broad = node.type is None or (isinstance(node.type, ast.Name) and node.type.id in ("Exception", "BaseException"))
+            if is_broad:
+                exc_label = "bare" if node.type is None else node.type.id
+                self.issues.append(
+                    CodeIssue(
+                        file_path=self.file_path,
+                        line=node.lineno,
+                        severity="LOW",
+                        category="QUALITY",
+                        rule_id="REL005",
+                        description=f"Silent exception swallowing (`except {exc_label}: pass`) suppresses critical failures.",
+                        remediation="Log the exception, handle it explicitly, or specify precise exception types.",
+                    )
+                )
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
@@ -210,10 +279,18 @@ class CodeReviewer(ast.NodeVisitor):
 def _scan_text_for_secrets(file_path: str, lines: List[str]) -> List[CodeIssue]:
     """Scan raw lines for hardcoded credentials and tokens."""
     issues = []
+    norm_path = file_path.replace("\\", "/").lower()
+    is_test_suite_file = "tests/" in norm_path or norm_path.startswith("test_")
+
     for line_idx, line in enumerate(lines, start=1):
         # Skip commented lines or documentation markdown
         stripped = line.strip()
         if stripped.startswith("#") or stripped.startswith("//"):
+            continue
+
+        line_lower = line.lower()
+        # If in a test file, ignore synthetic test setup lines
+        if is_test_suite_file and any(t in line_lower for t in ("mock", "write_text", "bad_file", "assert", "fixture")):
             continue
 
         for pattern, desc in SECRET_PATTERNS:

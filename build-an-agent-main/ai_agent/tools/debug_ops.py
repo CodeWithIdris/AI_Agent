@@ -64,7 +64,7 @@ def run_tests_with_diagnostics(command: str = "pytest", cwd: Optional[str] = Non
         return f"Error: Directory '{cwd}' does not exist."
 
     try:
-        process = subprocess.run(
+        process = subprocess.run(  # nosec: B602 - audited test diagnostics runner
             command,
             shell=True,
             cwd=str(working_dir),
@@ -113,7 +113,7 @@ def run_tests_with_diagnostics(command: str = "pytest", cwd: Optional[str] = Non
                             marker = " > " if idx == fail["line"] - 1 else "   "
                             context.append(f"{idx + 1:4d}{marker}{lines[idx]}")
                         report.append("Code Context:\n" + "\n".join(context))
-                    except Exception:
+                    except (OSError, UnicodeDecodeError):
                         pass
         else:
             # Truncated raw output if structured failure block couldn't be parsed

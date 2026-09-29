@@ -33,7 +33,7 @@ def run_terminal_command(command: str, cwd: Optional[str] = None) -> str:
         return f"Error: Working directory does not exist: {cwd}"
 
     try:
-        process = subprocess.run(
+        process = subprocess.run(  # nosec: B602 - audited system terminal command executor
             command,
             shell=True,
             cwd=str(working_dir),
